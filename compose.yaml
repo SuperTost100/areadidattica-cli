@@ -1,0 +1,15 @@
+services:
+  areadidattica:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Inside the container; the port mapping below keeps it on the host's loopback.
+      HOST: 0.0.0.0
+      PORT: 8788
+      DATA_DIR: /data
+      TZ: Europe/Rome
+    ports:
+      - "127.0.0.1:8788:8788"
+    volumes:
+      - ./data:/data

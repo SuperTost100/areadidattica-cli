@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "id": 7001, "title": "Chiusura straordinaria delle sedi", "message": "Domani 13 ottobre le sedi del Politecnico resteranno chiuse per allerta meteo.", "type": "emergency", "senderId": null, "sentAt": "2026-10-12T19:00:00Z", "isRead": false },
+    { "id": 7002, "title": "Ritiro smartcard", "message": "<p>Puoi venire a ritirare la tua smartcard presso la Segreteria Generale.</p>", "type": "personal", "senderId": 150157, "sentAt": "2026-10-01T10:00:00Z", "isRead": true }
+  ]
+}

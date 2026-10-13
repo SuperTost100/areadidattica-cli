@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "id": 445500, "publishedAt": "2026-10-12T08:00:00Z", "expiresAt": null, "content": "<p>Gentili studenti,</p>\r\r<p>la lezione di <strong>mercoled&igrave; 14 ottobre</strong> &egrave; spostata in aula 7T, dalle 13:00 alle 14:30.<br />\rIl materiale &egrave; su <a href=\"https://example.polito.it/sdp\">questa pagina</a>.</p>\r\r<p>Cordiali saluti,<br />\rStefano Quer</p>\r" },
+    { "id": 440001, "publishedAt": "2026-09-20T08:00:00Z", "expiresAt": null, "content": "<p>Benvenuti al corso.</p>" }
+  ]
+}
