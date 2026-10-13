@@ -49,7 +49,7 @@ console.log(`/notifications: ${notifications.length} total, ${noticeNotifs.lengt
 console.log(`/messages:      ${messages.length}`);
 console.log(`/deadlines:     ${deadlines.length} (PoliTO default window)`);
 console.log('Distinct notification scopes:');
-for (const s of new Set(notifications.map((n) => JSON.stringify(n.scope?.map((x) => (/^\d+$/.test(x) ? '<id>' : x)))))) {
+for (const s of new Set(notifications.map((n) => JSON.stringify(n.scope?.map((x) => (/^\d+$/.test(String(x)) ? '<id>' : x)))))) {
   console.log(`  ${s}`);
 }
 
