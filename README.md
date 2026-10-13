@@ -105,13 +105,13 @@ The server logs one line per request (method, path, status, time) and nothing el
 
 ## Does it sign you out of the phone app?
 
-It shouldn't, and the code is built to avoid it, but this hasn't been confirmed on a real account yet:
+No. Tested on a real account on 2026-10-13: the phone app stayed signed in after areadidattica logged in. The code is built for that:
 
 - It logs in with its own client id and the device name `areadidattica`, so PoliTO sees a second device, not a replacement for your phone.
 - It sends no push token, so push notifications keep going to the phone only.
 - It logs in once and keeps the token. Even if PoliTO allowed one session per account, the phone would be signed out at most once, not on every call.
 
-To check it yourself:
+To check it on your own account:
 
 1. Open the PoliTO app on your phone and make sure you're signed in.
 2. Run `npm run live-check -- --fresh-login` (see below).
@@ -156,4 +156,4 @@ The saved responses hold your personal data. `fixtures-live/` is gitignored; str
 
 ## License
 
-No license yet, so all rights are reserved. The PoliTO API spec and the PoliTO apps belong to Politecnico di Torino.
+MIT, see [`LICENSE`](LICENSE). The PoliTO API spec and the PoliTO apps belong to Politecnico di Torino.
