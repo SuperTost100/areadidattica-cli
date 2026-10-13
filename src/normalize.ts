@@ -195,13 +195,24 @@ export function htmlToText(html: string): string {
       const url = decodeEntities(href);
       return !l || decodeEntities(l) === url ? url : `${l} (${url})`;
     })
+    // A table becomes one line per row with tab-separated cells, so a reader can rebuild it.
+    // Teachers paste tables from Word, which wraps every cell in paragraphs.
+    .replace(/<table\b[\s\S]*?<\/table>/gi, (table) => {
+      const rows = [...table.matchAll(/<tr\b[\s\S]*?<\/tr>/gi)].map(([tr]) =>
+        [...tr.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+          .map(([, cell]) => cell!.replace(/<br\s*\/?>|<\/(p|div|li)>/gi, ' ').replace(/<[^>]+>/g, '').replace(/ +/g, ' ').trim())
+          .join('\t'),
+      );
+      return `\n\n${rows.filter((r) => r.replace(/\t/g, '').trim()).join('\n')}\n\n`;
+    })
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<li\b[^>]*>/gi, '\n- ')
     .replace(/<\/(p|div|h[1-6]|ul|ol|table|tr|blockquote)>/gi, '\n\n')
     .replace(/<[^>]+>/g, '');
   return decodeEntities(text)
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n[ \t]+/g, '\n')
+    // Spaces only: tabs are table cells, and an empty cell at either end still counts.
+    .replace(/ +\n/g, '\n')
+    .replace(/\n +/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

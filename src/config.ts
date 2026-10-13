@@ -28,7 +28,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   return {
     host: env.HOST || '127.0.0.1',
-    port: Number(env.PORT || 8788),
+    port: Number(env.PORT || 8789),
     apiToken: env.API_TOKEN!,
     dataDir: env.DATA_DIR || './data',
     polito: {

@@ -20,6 +20,18 @@ describe('htmlToText', () => {
   it('turns breaks and paragraphs into newlines, without piling up blank lines', () => {
     assert.equal(htmlToText('<p>uno<br/>due</p>\r\r<p></p><p>tre</p>'), 'uno\ndue\n\ntre');
   });
+
+  it('writes a table as one line per row, cells split by tabs, even with paragraphs in the cells', () => {
+    const html =
+      '<p>Calendario degli orali.</p><table><tbody>' +
+      '<tr><td><p><strong>MATRICOLA</strong></p></td><td><p>Giorno</p></td><td><p>Aula</p></td></tr>' +
+      '<tr><td><p>260240</p></td><td><p>Mercoled&igrave; 16<br>09:00</p></td><td></td></tr>' +
+      '</tbody></table><p>Cari saluti</p>';
+    assert.equal(
+      htmlToText(html),
+      'Calendario degli orali.\n\nMATRICOLA\tGiorno\tAula\n260240\tMercoledì 16 09:00\t\n\nCari saluti',
+    );
+  });
 });
 
 describe('parseNoticeScope', () => {
