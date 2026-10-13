@@ -26,6 +26,8 @@ describe('parseNoticeScope', () => {
   it('reads the course id, with or without the teaching prefix and notice id', () => {
     assert.deepEqual(parseNoticeScope(['courses', '258674', 'notices']), { courseKey: '258674', noticeId: null });
     assert.deepEqual(parseNoticeScope(['teaching', 'courses', '1', 'notices', '42']), { courseKey: '1', noticeId: 42 });
+    // The live API sends the ids as numbers.
+    assert.deepEqual(parseNoticeScope(['teaching', 'courses', 303878, 'notices', 531892]), { courseKey: '303878', noticeId: 531892 });
   });
 
   it('ignores files, lectures and message notifications', () => {
@@ -53,6 +55,7 @@ describe('pickNotice', () => {
 describe('courseFromTitle', () => {
   it('extracts the course from "Nuovo avviso da ..."', () => {
     assert.equal(courseFromTitle('Nuovo avviso da Basi di dati'), 'Basi di dati');
+    assert.equal(courseFromTitle('Nuovo avviso nel Corso di Analisi matematica II'), 'Analisi matematica II');
     assert.equal(courseFromTitle('Chiusura sedi'), null);
   });
 });

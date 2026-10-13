@@ -1,7 +1,7 @@
 {
   "data": [
     { "id": 901, "title": "Nuovo avviso da System and device programming", "message": "Spostamento lezione", "scope": ["courses", "258674", "notices"], "sentAt": "2026-10-12T08:01:00Z", "isRead": false },
-    { "id": 902, "title": "Nuovo avviso da Basi di dati", "message": "Esercitazione", "scope": ["teaching", "courses", "261234", "notices", "445566"], "sentAt": "2026-10-10T15:30:00Z", "isRead": true },
+    { "id": 902, "title": "Nuovo avviso nel Corso di Basi di dati", "message": "Esercitazione", "scope": ["teaching", "courses", 261234, "notices", 445566], "sentAt": "2026-10-10T15:30:00Z", "isRead": true },
     { "id": 903, "title": "Nuovo materiale nel corso di Fisica", "message": "Nuovo file presentazione.pdf aggiunto al materiale del corso di Fisica", "scope": ["teaching", "courses", "258674", "files"], "sentAt": "2026-10-11T10:00:00Z", "isRead": false },
     { "id": 904, "title": "Nuovo messaggio dalla Segreteria Studenti", "message": "Chiusura sedi", "scope": ["messages", "7001"], "sentAt": "2026-10-12T19:00:00Z", "isRead": false },
     { "id": 905, "title": "Nuovo avviso da Analisi matematica I", "message": "Avviso senza corso numerico", "scope": ["courses", "01RKCOV", "notices"], "sentAt": "2026-10-09T09:00:00Z", "isRead": false }

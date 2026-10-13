@@ -5,7 +5,8 @@ export interface Notification {
   id: number;
   title: string;
   message: string | null;
-  scope?: string[];
+  // Ids inside the scope arrive as numbers from the live API, as strings in the spec.
+  scope?: (string | number)[];
   sentAt: string;
   isRead: boolean;
 }
@@ -65,19 +66,19 @@ export interface NoticeScope {
 // Notification scopes look like ["courses","258674","notices"], optionally
 // prefixed with "teaching" and followed by the notice id. Returns null for
 // anything that isn't a course notice (files, lectures, tickets, messages).
-export function parseNoticeScope(scope: string[] | undefined): NoticeScope | null {
+export function parseNoticeScope(scope: (string | number)[] | undefined): NoticeScope | null {
   if (!scope) return null;
   const i = scope.indexOf('courses');
   if (i < 0 || scope[i + 2] !== 'notices' || !scope[i + 1]) return null;
   const noticeId = Number(scope[i + 3]);
   return {
-    courseKey: scope[i + 1]!,
+    courseKey: String(scope[i + 1]),
     noticeId: Number.isInteger(noticeId) && noticeId > 0 ? noticeId : null,
   };
 }
 
 // Notifications scoped to a school message: ["messages","123"].
-export function messageIdFromScope(scope: string[] | undefined): number | null {
+export function messageIdFromScope(scope: (string | number)[] | undefined): number | null {
   if (!scope) return null;
   const i = scope.indexOf('messages');
   const id = Number(scope[i + 1]);
@@ -107,7 +108,7 @@ export function pickNotice(
   return best;
 }
 
-const TITLE_COURSE = /^nuovo avviso (?:da|dal corso(?: di)?)\s+(.+)$/i;
+const TITLE_COURSE = /^nuovo avviso (?:da|dal corso(?: di)?|nel corso(?: di)?)\s+(.+)$/i;
 
 export function courseFromTitle(title: string): string | null {
   return TITLE_COURSE.exec(title.trim())?.[1]?.trim() ?? null;
