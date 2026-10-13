@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node src/main.ts",
-    "test": "node --test \"test/**/*.test.ts\"",
+    "test": "node --test --test-force-exit \"test/**/*.test.ts\"",
     "typecheck": "tsc",
     "live-check": "node --env-file=.env scripts/live-check.ts"
   },

@@ -10,7 +10,7 @@ Course avvisi don't arrive by email, so the PoliTO app API is the only place to 
 
 ## What it does
 
-1. **Logs in once.** It calls `POST /auth/login` the way the app does and stores the token in `data/session.json` (mode `600`). It reuses that token, also across restarts, and logs in again only when PoliTO answers `401`. After a rejected login it waits 5 minutes before trying again, so a wrong password can't lock the account.
+1. **Logs in once.** It calls `POST /auth/login` the way the app does and stores the token in `data/session.json` (mode `600`). It reuses that token, also across restarts, and logs in again only when PoliTO answers `401`. If PoliTO rejects the login, or refuses a token it just issued, the service stops logging in for 5 minutes. The pause is saved in `data/session.json`, so a restart doesn't lift it. A wrong password therefore costs at most one login attempt every 5 minutes; whether that is slow enough to avoid a lockout depends on PoliTO's rules, which aren't public.
 2. **Fetches on request.** `GET /items` reads `/notifications` and `/messages`, keeps the course avvisi, and fetches each course's notice list for the full text. `GET /deadlines` reads `/deadlines`.
 3. **Stays gentle on PoliTO.** Upstream calls run one at a time with a 250 ms gap, even when several requests arrive together. Course notice lists are cached for 5 minutes and the course list for 6 hours.
 4. **Marks things read.** `POST /items/{id}/read` marks the avviso or message read on PoliTO, so the phone app shows it as read too.
@@ -109,7 +109,7 @@ PoliTO's deadlines are administrative (fees, enrolment, graduation sessions), so
 
 ### `POST /items/{id}/read`
 
-Marks one item read on PoliTO. URL-encode the id (`notification%3A901`); a plain colon works too. Marking a message read also clears the push notification that announced it.
+Marks one item read on PoliTO. URL-encode the id (`notification%3A901`); a plain colon works too. Marking a message read also marks the push notification that announced it. If that second step fails, the request still succeeds, because the message itself is already read, and `/health` shows the error.
 
 - `400` when the id isn't `notification:<n>` or `message:<n>`.
 - `404` when PoliTO doesn't know the id.
@@ -120,7 +120,7 @@ Marks one item read on PoliTO. URL-encode the id (`notification%3A901`); a plain
 { "ok": true, "loggedIn": true, "lastError": null }
 ```
 
-`loggedIn` says whether a token is stored. `lastError` is the message from the last failed PoliTO call, and goes back to `null` after the next successful one; `ok` is `false` while it's set. This endpoint makes no PoliTO calls.
+`loggedIn` says whether a token is stored. `lastError` is the message from the last failed PoliTO call, and goes back to `null` after the next successful one; `ok` is `false` while it's set. `lastError` can be set even when `/items` returned 200: if one course's notice list fails, those avvisi fall back to their short push text. This endpoint makes no PoliTO calls.
 
 ### Errors
 
@@ -181,7 +181,7 @@ The server logs one line per request (method, path, status, time) and nothing el
 
 ```bash
 npm ci
-npm test            # 36 tests against a fake PoliTO server, no network
+npm test            # 38 tests against a fake PoliTO server, no network
 npm run typecheck
 ```
 

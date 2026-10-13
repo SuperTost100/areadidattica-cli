@@ -15,6 +15,9 @@ interface Session {
   clientId: string;
   token: string | null;
   loggedInAt: string | null;
+  // Epoch ms; no login attempts before this.
+  loginPausedUntil: number;
+  loginPauseReason: string | null;
 }
 
 export interface PolitoClientOptions {
@@ -43,8 +46,6 @@ export class PolitoClient {
   #queue: Promise<unknown> = Promise.resolve();
   #lastCallAt = 0;
   #loginPromise: Promise<string> | null = null;
-  #loginBlockedUntil = 0;
-  #loginRejection = '';
 
   constructor(opts: PolitoClientOptions) {
     this.#opts = opts;
@@ -63,10 +64,18 @@ export class PolitoClient {
         clientId: String(raw.clientId),
         token: raw.token ?? null,
         loggedInAt: raw.loggedInAt ?? null,
+        loginPausedUntil: Number(raw.loginPausedUntil) || 0,
+        loginPauseReason: raw.loginPauseReason ?? null,
       };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-      this.#session = { clientId: randomUUID(), token: null, loggedInAt: null };
+      this.#session = {
+        clientId: randomUUID(),
+        token: null,
+        loggedInAt: null,
+        loginPausedUntil: 0,
+        loginPauseReason: null,
+      };
     }
   }
 
@@ -81,17 +90,23 @@ export class PolitoClient {
   // Sends an authenticated request. Logs in when there is no token yet, and
   // logs in again once if PoliTO answers 401.
   async request<T>(method: string, apiPath: string): Promise<T> {
+    const label = `${method} ${apiPath}`;
     try {
-      let token = this.#session?.token ?? (await this.login());
+      const stored = this.#session?.token ?? null;
+      let token = stored ?? (await this.login());
       let res = await this.#send(method, apiPath, token);
-      if (res.status === 401) {
+      if (res.status === 401 && stored) {
         // Another request may already have replaced the expired token.
-        token = this.#session?.token && this.#session.token !== token
-          ? this.#session.token
-          : await this.login();
+        const current = this.#session?.token;
+        token = current && current !== stored ? current : await this.login();
         res = await this.#send(method, apiPath, token);
       }
-      const body = await parseBody(res, `${method} ${apiPath}`);
+      if (res.status === 401) {
+        // PoliTO refused a token it just issued. Logging in again on every
+        // request would only pile up sessions, so pause instead.
+        await this.#pauseLogins(`${label} refused a new token with HTTP 401`);
+      }
+      const body = parseBody(res, label);
       this.lastError = null;
       return body as T;
     } catch (err) {
@@ -109,9 +124,10 @@ export class PolitoClient {
   }
 
   async #login(): Promise<string> {
-    if (Date.now() < this.#loginBlockedUntil) {
+    const paused = this.#session?.loginPausedUntil ?? 0;
+    if (Date.now() < paused) {
       throw new UpstreamError(
-        `login paused until ${new Date(this.#loginBlockedUntil).toISOString()} after a rejected login (${this.#loginRejection})`,
+        `login paused until ${new Date(paused).toISOString()} (${this.#session?.loginPauseReason})`,
         0,
       );
     }
@@ -140,10 +156,9 @@ export class PolitoClient {
       },
     });
     if (res.status >= 400 && res.status < 500) {
-      this.#loginBlockedUntil = Date.now() + LOGIN_BACKOFF_MS;
-      this.#loginRejection = `HTTP ${res.status}`;
+      await this.#pauseLogins(`login rejected with HTTP ${res.status}`);
     }
-    const body = (await parseBody(res, 'login')) as {
+    const body = parseBody(res, 'login') as {
       data?: { token?: string; clientId?: string };
     };
     const token = body?.data?.token;
@@ -153,27 +168,46 @@ export class PolitoClient {
       clientId: body.data?.clientId || session.clientId,
       token,
       loggedInAt: new Date().toISOString(),
+      loginPausedUntil: 0,
+      loginPauseReason: null,
     };
     this.logins++;
     await this.#saveSession();
     return token;
   }
 
+  // The pause is saved with the session, so a restart doesn't lift it.
+  async #pauseLogins(reason: string): Promise<void> {
+    this.#session = {
+      ...this.#session!,
+      token: null,
+      loginPausedUntil: Date.now() + LOGIN_BACKOFF_MS,
+      loginPauseReason: reason,
+    };
+    await this.#saveSession();
+  }
+
+  // A failed write keeps the session in memory only; the request still succeeds.
   async #saveSession(): Promise<void> {
-    await mkdir(this.#opts.dataDir, { recursive: true });
-    const tmp = `${this.#sessionFile}.tmp`;
-    await writeFile(tmp, JSON.stringify(this.#session, null, 2), { mode: 0o600 });
-    await rename(tmp, this.#sessionFile);
+    try {
+      await mkdir(this.#opts.dataDir, { recursive: true });
+      const tmp = `${this.#sessionFile}.tmp`;
+      await writeFile(tmp, JSON.stringify(this.#session, null, 2), { mode: 0o600 });
+      await rename(tmp, this.#sessionFile);
+    } catch (err) {
+      console.error(`could not save ${this.#sessionFile}: ${(err as NodeJS.ErrnoException).code ?? err}`);
+    }
   }
 
   // Every upstream call goes through this queue: one at a time, with a small
-  // gap between calls.
+  // gap between calls. The body is read inside the queue too, so the next
+  // call starts only after this one has fully finished.
   #send(
     method: string,
     apiPath: string,
     token: string | null,
     body?: unknown,
-  ): Promise<Response> {
+  ): Promise<RawResponse> {
     const run = async () => {
       const wait = this.#lastCallAt + (this.#opts.gapMs ?? 0) - Date.now();
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -185,12 +219,13 @@ export class PolitoClient {
       if (token) headers.authorization = `Bearer ${token}`;
       if (body !== undefined) headers['content-type'] = 'application/json';
       try {
-        return await fetch(this.#opts.baseUrl + apiPath, {
+        const res = await fetch(this.#opts.baseUrl + apiPath, {
           method,
           headers,
           body: body === undefined ? undefined : JSON.stringify(body),
           signal: AbortSignal.timeout(this.#opts.timeoutMs ?? 20_000),
         });
+        return { status: res.status, text: await res.text() };
       } catch (err) {
         const label = apiPath === '/auth/login' ? 'login' : `${method} ${apiPath}`;
         throw new UpstreamError(`${label}: ${(err as Error).message}`, 0);
@@ -204,9 +239,13 @@ export class PolitoClient {
   }
 }
 
-async function parseBody(res: Response, label: string): Promise<unknown> {
-  const text = await res.text();
-  if (!res.ok) {
+interface RawResponse {
+  status: number;
+  text: string;
+}
+
+function parseBody({ status, text }: RawResponse, label: string): unknown {
+  if (status < 200 || status > 299) {
     let detail = '';
     try {
       const err = JSON.parse(text);
@@ -214,7 +253,12 @@ async function parseBody(res: Response, label: string): Promise<unknown> {
     } catch {
       // Not JSON: report the status alone.
     }
-    throw new UpstreamError(`${label} failed with HTTP ${res.status}${detail}`, res.status);
+    throw new UpstreamError(`${label} failed with HTTP ${status}${detail}`, status);
   }
-  return text ? JSON.parse(text) : null;
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new UpstreamError(`${label} returned HTTP ${status} with a body that isn't JSON`, status);
+  }
 }

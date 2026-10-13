@@ -38,7 +38,7 @@ export class Service {
   #notices = new Map<string, Cached<CourseNotice[]>>();
   #courses: Cached<Map<string, string>> | null = null;
   // Last notification feed, used to clear notifications tied to a message.
-  #lastNotifications: Notification[] = [];
+  #lastNotifications: Notification[] | null = null;
 
   constructor(client: PolitoClient, opts: { noticesTtlMs: number; now?: () => number }) {
     this.#client = client;
@@ -78,11 +78,20 @@ export class Service {
     }
     await this.#client.put(`/messages/${num}/read`);
     // The phone also shows a notification for the message; clear it too.
-    for (const n of this.#lastNotifications) {
-      if (!n.isRead && messageIdFromScope(n.scope) === Number(num)) {
-        await this.#client.put(`/notifications/${n.id}/read`);
-        n.isRead = true;
+    // The message is already marked read, so a failure here doesn't fail
+    // the request; it shows up in /health as lastError.
+    try {
+      this.#lastNotifications ??= (
+        await this.#client.get<{ data: Notification[] }>('/notifications')
+      ).data;
+      for (const n of this.#lastNotifications) {
+        if (!n.isRead && messageIdFromScope(n.scope) === Number(num)) {
+          await this.#client.put(`/notifications/${n.id}/read`);
+          n.isRead = true;
+        }
       }
+    } catch {
+      return;
     }
   }
 

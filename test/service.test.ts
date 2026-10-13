@@ -224,7 +224,7 @@ describe('login and token reuse', () => {
     assert.match(health.body.lastError, /login failed with HTTP 401: Credenziali non valide/);
 
     const second = await svc.call('GET', '/items');
-    assert.match(second.body.error, /login paused until .* \(HTTP 401\)/);
+    assert.match(second.body.error, /login paused until .* \(login rejected with HTTP 401\)/);
     assert.equal(fake.count('POST', '/auth/login'), 1);
 
     const everything = JSON.stringify([first, health, second, svc.logs]);
@@ -233,6 +233,29 @@ describe('login and token reuse', () => {
     fake.state.loginStatus = 200;
     await svc.close();
     await svc.cleanup();
+  });
+});
+
+describe('login pause', () => {
+  it('stops logging in when PoliTO refuses fresh tokens, also after a restart', async () => {
+    const fake = await startFakePolito();
+    fake.state.rejectTokens = true;
+    const svc = await startService(fake.baseUrl);
+
+    assert.equal((await svc.call('GET', '/items')).status, 502);
+    assert.equal(fake.count('POST', '/auth/login'), 1);
+
+    const again = await svc.call('GET', '/items');
+    assert.equal(again.status, 502);
+    assert.match(again.body.error, /login paused until .*refused a new token with HTTP 401/);
+    await svc.close();
+
+    const restarted = await startService(fake.baseUrl, { dataDir: svc.dataDir });
+    assert.match((await restarted.call('GET', '/items')).body.error, /login paused/);
+    assert.equal(fake.count('POST', '/auth/login'), 1);
+    await restarted.close();
+    await restarted.cleanup();
+    await fake.close();
   });
 });
 
@@ -262,6 +285,15 @@ describe('POST /items/{id}/read', () => {
     assert.equal(status, 200);
     assert.equal(fake.count('PUT', '/messages/7001/read'), 1);
     assert.equal(fake.count('PUT', '/notifications/904/read'), 1);
+  });
+
+  it('clears the push notification even without a prior GET /items', async () => {
+    const fresh = await startService(fake.baseUrl);
+    const before = fake.count('PUT', '/notifications/904/read');
+    assert.equal((await fresh.call('POST', '/items/message:7001/read')).status, 200);
+    assert.equal(fake.count('PUT', '/notifications/904/read'), before + 1);
+    await fresh.close();
+    await fresh.cleanup();
   });
 
   it('rejects unknown ids with 400', async () => {
@@ -328,6 +360,11 @@ describe('GET /health', () => {
       loggedIn: true,
       lastError: 'GET /notifications failed with HTTP 500: boom',
     });
+
+    fake.state.fail.set('/notifications', { status: 200, body: '<html>Manutenzione</html>' });
+    const notJson = await svc.call('GET', '/items');
+    assert.equal(notJson.status, 502);
+    assert.match(notJson.body.error, /isn't JSON/);
 
     fake.state.fail.delete('/notifications');
     await svc.call('GET', '/items');

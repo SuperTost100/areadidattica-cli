@@ -29,9 +29,11 @@ export async function startFakePolito() {
     tokenCounter: 0,
     inFlight: 0,
     maxInFlight: 0,
-    // Path → status to return instead of the fixture.
-    fail: new Map<string, number>(),
+    // Path → status to return instead of the fixture, with an optional body.
+    fail: new Map<string, number | { status: number; body: string }>(),
     loginStatus: 200,
+    // Answer 401 to every token, even fresh ones.
+    rejectTokens: false,
   };
 
   const server = http.createServer((req, res) => {
@@ -57,7 +59,9 @@ export async function startFakePolito() {
         res.end(body);
       };
 
-      if (state.fail.has(p)) return json(state.fail.get(p)!, '{"code":1,"message":"boom"}');
+      const failure = state.fail.get(p);
+      if (typeof failure === 'number') return json(failure, '{"code":1,"message":"boom"}');
+      if (failure) return json(failure.status, failure.body);
       if (p === '/auth/login' && req.method === 'POST') {
         if (state.loginStatus !== 200) {
           return json(state.loginStatus, '{"code":401,"message":"Credenziali non valide"}');
@@ -69,7 +73,7 @@ export async function startFakePolito() {
         return json(200, JSON.stringify(body));
       }
       const token = req.headers.authorization?.replace(/^Bearer /, '');
-      if (!token || !state.validTokens.has(token)) return json(401, '{"code":401,"message":"Unauthorized"}');
+      if (!token || !state.validTokens.has(token) || state.rejectTokens) return json(401, '{"code":401,"message":"Unauthorized"}');
 
       const routes: Record<string, string> = {
         'GET /notifications': 'notifications',
