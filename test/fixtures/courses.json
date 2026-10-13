@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "id": 258674, "name": "System and device programming", "shortcode": "01NYHOV", "cfu": 10, "teachingPeriod": "1-1", "teacherId": 2893, "teacherName": "Stefano Quer", "previousEditions": [], "isOverBooking": false, "category": "I", "enrollmentRole": "student", "year": "2026", "modules": null },
+    { "id": null, "name": "Basi di dati (corso integrato)", "shortcode": "02BDDOV", "cfu": 10, "teachingPeriod": "1-1", "teacherId": null, "teacherName": null, "previousEditions": [], "isOverBooking": false, "category": "I", "enrollmentRole": "student", "year": "2026", "modules": [ { "id": 261234, "name": "Basi di dati", "shortcode": "02BDDOV", "previousEditions": [] } ] }
+  ]
+}

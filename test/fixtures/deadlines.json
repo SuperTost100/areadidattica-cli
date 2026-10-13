@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "name": "Termine iscrizione esame finale", "type": "Sessioni esami di laurea", "date": "2026-11-14", "url": null },
+    { "id": 55, "name": "Termine per l'iscrizione e pagamento della prima rata", "type": "Iscrizioni e pagamento tasse", "date": "2026-10-20", "url": "https://www.polito.it/tasse" }
+  ]
+}
