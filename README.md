@@ -1,13 +1,38 @@
-<img src="assets/icon.svg" width="64" height="64" alt="">
+<p align="center">
+  <img src="assets/icon.svg" width="80" height="80" alt="">
+</p>
 
-# areadidattica
+<h1 align="center">areadidattica</h1>
 
-areadidattica puts your Politecnico di Torino course avvisi, school messages and deadlines behind a small JSON API on your own computer, so a dashboard, a bot or a script can read them and mark them read.
+<p align="center">
+  Your Politecnico di Torino course avvisi, school messages and deadlines as a small JSON API on your own computer.<br>
+  A dashboard, a bot or a script reads them and marks them read.
+</p>
 
-Course avvisi don't arrive by email. They live on the Portale della Didattica and in the PoliTO Students app, where they're easy to miss. areadidattica logs in to your account the way that app does, using the [API PoliTO publishes for its own apps](https://github.com/polito/api-spec), and answers on `127.0.0.1` only. It runs as one Docker container. Your password stays in a `.env` file on your machine, and nothing is hosted anywhere else. There's no account to create and nothing to pay.
+<p align="center">
+  <a href="https://github.com/SuperTost100/areadidattica-cli/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/SuperTost100/areadidattica-cli/ci.yml?branch=main&label=checks"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-0b2e4f"></a>
+</p>
+
+<p align="center">
+  <a href="#start">Start</a> ·
+  <a href="docs/api.md">API reference</a> ·
+  <a href="#your-data">Your data</a>
+</p>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/terminal-dark.png">
+  <img alt="A terminal running curl against the local API. It lists two unread items: an urgent school message that closes the offices on 13 October, and an avviso from System and device programming that moves a lecture to room 7T." src="docs/screenshots/terminal-light.png">
+</picture>
 
 > [!IMPORTANT]
 > This is not an official PoliTO project. The API is meant for PoliTO's own apps and has no public developer program, so it can change without notice and break this tool until it's updated.
+
+## Why areadidattica
+
+Course avvisi don't arrive by email. They live on the Portale della Didattica and in the PoliTO Students app, where they're easy to miss. areadidattica logs in to your account the way that app does, using the [API PoliTO publishes for its own apps](https://github.com/polito/api-spec), and answers on `127.0.0.1` only.
+
+It runs as one Docker container. Your password stays in a `.env` file on your machine, and nothing is hosted anywhere else. There's no account to create and nothing to pay.
 
 ## What it does
 
@@ -17,37 +42,11 @@ Course avvisi don't arrive by email. They live on the Portale della Didattica an
 4. **Marks things read.** `POST /items/{id}/read` marks an avviso or message read on PoliTO, so the phone app stops counting it too.
 5. **Stays gentle on PoliTO.** It makes one call at a time, at least 250 ms apart, and caches course notice lists for 5 minutes.
 
-```bash
-curl -s -H "Authorization: Bearer $API_TOKEN" 'http://127.0.0.1:8789/items?unread=true'
-```
-
-```json
-{
-  "items": [
-    {
-      "id": "notification:901",
-      "kind": "avviso",
-      "course": "System and device programming",
-      "title": "Nuovo avviso da System and device programming",
-      "text": "Gentili studenti,\n\nla lezione di mercoledì 14 ottobre è spostata in aula 7T, dalle 13:00 alle 14:30.",
-      "sentAt": "2026-10-12T08:01:00Z",
-      "isRead": false,
-      "urgent": false,
-      "sourceUrl": null
-    }
-  ]
-}
-```
-
 The [API reference](docs/api.md) has every endpoint and field.
 
-## Requirements
-
-- Docker with Compose, to run it.
-- Node.js 24 or newer, only for the tests and the live check. Node runs the TypeScript directly, so there's no build step.
-- A PoliTO student account that signs in to the PoliTO Students app without MFA.
-
 ## Start
+
+You need Docker with Compose, and a PoliTO student account that signs in to the PoliTO Students app without MFA. Node.js 24 or newer is only for the tests and the live check. Node runs the TypeScript directly, so there's no build step.
 
 ```bash
 git clone https://github.com/SuperTost100/areadidattica-cli.git areadidattica
@@ -55,7 +54,7 @@ cd areadidattica
 cp .env.example .env
 ```
 
-Open `.env` and fill in `POLITO_USERNAME` (like `s123456`), `POLITO_PASSWORD` and `API_TOKEN`. The token is the secret your dashboard or script will send; generate one with:
+Open `.env` and fill in `POLITO_USERNAME` (like `s123456`), `POLITO_PASSWORD` and `API_TOKEN`. The token is the secret your dashboard or script will send. Generate one with:
 
 ```bash
 openssl rand -hex 32
@@ -84,7 +83,7 @@ The port is published on `127.0.0.1` only. Another Compose project, such as a da
 
 ### Try it without your account
 
-PoliTO runs a public mock of the same API, which accepts any login and answers with example data. Set this in `.env` to try everything first:
+PoliTO runs a public mock of the same API, which accepts any login and answers with example data. It holds one school message from 2021 and a few deadlines, enough to see it work. Set this in `.env` to try everything first:
 
 ```bash
 POLITO_BASE_URL=https://app.didattica.polito.it/mock/api
@@ -114,7 +113,7 @@ No. Tested on a real account on 2026-10-13: the phone app stayed signed in after
 To check it on your own account:
 
 1. Open the PoliTO app on your phone and make sure you're signed in.
-2. Run `npm run live-check -- --fresh-login` (see below).
+2. Run `npm run live-check -- --fresh-login` (see [Development](#development)).
 3. Pull to refresh the notifications on your phone. If the app asks you to sign in again, logging in here signed the phone out.
 
 ## Configuration
@@ -130,9 +129,9 @@ Set these in `.env`. [`.env.example`](.env.example) has the template.
 | `UPSTREAM_GAP_MS`       | no       | `250`                                 | Minimum pause between two PoliTO calls            |
 | `POLITO_APP_VERSION`    | no       | `1.6.2`                               | App version sent at login                         |
 | `POLITO_BUILD_NUMBER`   | no       | `1060200`                             | App build number sent at login                    |
-| `POLITO_BASE_URL`       | no       | `https://app.didattica.polito.it/api` | API base; the public mock is at `/mock/api`       |
-| `HOST`, `PORT`          | no       | `127.0.0.1`, `8789`                   | Where the server listens; Compose sets both       |
-| `DATA_DIR`              | no       | `./data`                              | Where `session.json` lives; Compose uses `/data`  |
+| `POLITO_BASE_URL`       | no       | `https://app.didattica.polito.it/api` | API base. The public mock is at `/mock/api`       |
+| `HOST`, `PORT`          | no       | `127.0.0.1`, `8789`                   | Where the server listens. Compose sets both       |
+| `DATA_DIR`              | no       | `./data`                              | Where `session.json` lives. Compose uses `/data`  |
 
 ## Development
 
@@ -144,7 +143,7 @@ npm run typecheck
 
 The tests serve the JSON in [`test/fixtures/`](test/fixtures/) from a local stand-in for the PoliTO API. CI runs the same commands plus `docker build`.
 
-`npm run live-check` calls the real PoliTO API with the credentials in `.env`. It prints counts, the notification scopes it saw and the five newest items, never the password or the token.
+`npm run live-check` calls the PoliTO API named in `.env` with your credentials. It prints counts, the notification scopes it saw and the five newest items, never the password or the token.
 
 ```bash
 npm run live-check                           # reuses the stored token
@@ -152,7 +151,7 @@ npm run live-check -- --fresh-login          # forces a new login
 npm run live-check -- --save fixtures-live   # also saves the raw responses
 ```
 
-The saved responses hold your personal data. `fixtures-live/` is gitignored; strip names and ids before copying anything into `test/fixtures/`.
+The saved responses hold your personal data. `fixtures-live/` is gitignored. Strip names and ids before copying anything into `test/fixtures/`.
 
 ## License
 
