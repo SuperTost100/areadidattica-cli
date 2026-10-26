@@ -15,11 +15,11 @@ import {
   type Notification,
 } from './normalize.ts';
 
-interface CourseOverview {
+export interface CourseOverview {
   id: number | null;
   name: string;
   shortcode?: string;
-  modules?: { id: number | null; name: string }[] | null;
+  modules?: { id: number | null; name: string; shortcode?: string }[] | null;
 }
 
 interface Cached<T> {
@@ -95,6 +95,37 @@ export class Service {
     }
   }
 
+  async courses(): Promise<CourseOverview[]> {
+    return (await this.#client.get<{ data: CourseOverview[] }>('/v2/courses')).data;
+  }
+
+  // Courses and the modules of integrated courses, each with the id that
+  // course endpoints take. Integrated courses have no id of their own.
+  async courseList(): Promise<{ id: string; name: string; shortcode: string | null }[]> {
+    const all = (await this.courses()).flatMap((c) => [c, ...(c.modules ?? [])]);
+    const list = all
+      .filter((c) => c.id != null)
+      .map((c) => ({ id: String(c.id), name: c.name, shortcode: c.shortcode ?? null }));
+    // A course with one module lists the same id twice; keep the first.
+    return [...new Map(list.map((c) => [c.id, c])).values()];
+  }
+
+  // Finds one course or module from an id, a shortcode like 01NYHOV, or part
+  // of its name. Several matches is an error that lists them.
+  async resolveCourse(query: string): Promise<{ id: string; name: string; shortcode: string | null }> {
+    const candidates = await this.courseList();
+    const q = fold(query);
+    const exact = candidates.filter(
+      (c) => c.id === query.trim() || fold(c.shortcode ?? '') === q || fold(c.name) === q,
+    );
+    const unique = exact.length ? exact : candidates.filter((c) => fold(c.name).includes(q));
+    if (unique.length === 1) return unique[0]!;
+    if (!unique.length) {
+      throw new BadRequest(`no course matches "${query}". Courses: ${candidates.map((c) => `${c.name} (${c.id})`).join(', ')}`);
+    }
+    throw new BadRequest(`"${query}" matches ${unique.length} courses: ${unique.map((c) => `${c.name} (${c.id})`).join(', ')}`);
+  }
+
   async deadlines(from: string, to: string): Promise<DeadlineItem[]> {
     const q = new URLSearchParams({ fromDate: from, toDate: to });
     const res = await this.#client.get<{ data: Deadline[] }>(`/deadlines?${q}`);
@@ -137,4 +168,9 @@ export class Service {
     }
     return names;
   }
+}
+
+// Lowercase without accents, so "meccanica" finds "Meccànica".
+function fold(s: string): string {
+  return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
 }

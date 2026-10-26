@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 import type { PolitoClient } from './polito.ts';
 import { UpstreamError } from './polito.ts';
+import { romeDate } from './normalize.ts';
 import { BadRequest, type Service } from './service.ts';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -82,10 +83,4 @@ export function createServer(opts: {
 
 function sha256(s: string): Buffer {
   return createHash('sha256').update(s).digest();
-}
-
-// Today plus `days`, as a calendar date in Turin.
-function romeDate(days: number): string {
-  const d = new Date(Date.now() + days * 86_400_000);
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(d);
 }

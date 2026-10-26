@@ -34,6 +34,12 @@ export async function startFakePolito() {
     loginStatus: 200,
     // Answer 401 to every token, even fresh ones.
     rejectTokens: false,
+    // File id → bytes the file host serves. Default 1500.
+    fileSizes: new Map<string, number>(),
+    // Send files without content-length, so only the bytes tell their size.
+    hideLength: false,
+    // File id → bytes to send before the connection drops.
+    cutAfter: new Map<string, number>(),
   };
 
   const server = http.createServer((req, res) => {
@@ -72,6 +78,21 @@ export async function startFakePolito() {
         body.data.token = token;
         return json(200, JSON.stringify(body));
       }
+      const hosted = /^\/files-host\/(\d+)$/.exec(url.pathname);
+      if (hosted) {
+        const size = Number(state.fileSizes.get(hosted[1]!) ?? 1500);
+        const headers: Record<string, string> = { 'content-type': 'application/octet-stream' };
+        if (!state.hideLength) headers['content-length'] = String(size);
+        res.writeHead(200, headers);
+        const cut = state.cutAfter.get(hosted[1]!);
+        if (cut !== undefined) {
+          // Send part of the file, then drop the connection.
+          res.write(Buffer.alloc(cut, 'x'), () => res.destroy());
+          return;
+        }
+        res.end(Buffer.alloc(size, hosted[1]!.slice(-1)));
+        return;
+      }
       const token = req.headers.authorization?.replace(/^Bearer /, '');
       if (!token || !state.validTokens.has(token) || state.rejectTokens) return json(401, '{"code":401,"message":"Unauthorized"}');
 
@@ -82,12 +103,23 @@ export async function startFakePolito() {
         'GET /deadlines': 'deadlines',
         'GET /courses/258674/notices': 'notices-258674',
         'GET /courses/261234/notices': 'notices-261234',
+        'GET /courses/258674/files': 'files-258674',
+        'GET /exams': 'exams',
       };
       const name = routes[`${req.method} ${p}`];
       if (name) return json(200, fixture(name));
       if (req.method === 'PUT' && /^\/(notifications|messages)\/\d+\/read$/.test(p)) {
         res.writeHead(204).end();
         return;
+      }
+      // Like PoliTO: the API answers a download with a redirect to the file.
+      const file = /^\/courses\/258674\/files\/(\d+)$/.exec(p);
+      if (file && req.method === 'GET') {
+        res.writeHead(302, { location: `/files-host/${file[1]}` }).end();
+        return;
+      }
+      if (/^\/(exams\/\d+\/booking|provisional-grades\/\d+\/(accept|reject)|bookings(\/\d+)?)$/.test(p)) {
+        return json(200, '{"data":{"ok":true}}');
       }
       json(404, '{"code":404,"message":"Not found"}');
     });

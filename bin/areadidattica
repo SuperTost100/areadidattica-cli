@@ -1,0 +1,14 @@
+#!/bin/sh
+# Runs the areadidattica command line. Put it on your PATH with:
+#   ln -s "$PWD/bin/areadidattica" ~/.local/bin/areadidattica
+# Follows symlinks by hand, since readlink -f is missing on older macOS.
+script=$0
+while [ -L "$script" ]; do
+  target=$(readlink "$script") || exit 1
+  case "$target" in
+    /*) script=$target ;;
+    *) script=$(dirname "$script")/$target ;;
+  esac
+done
+dir=$(CDPATH= cd -P "$(dirname "$script")" && pwd) || exit 1
+exec node "$dir/../src/cli.ts" "$@"

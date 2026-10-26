@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
-  "description": "Local JSON API over the PoliTO Students app API",
+  "description": "Command line and local JSON API over the PoliTO Students app API",
   "type": "module",
   "engines": {
     "node": ">=24"
