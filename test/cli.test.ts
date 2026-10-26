@@ -208,6 +208,15 @@ describe('areadidattica command line', () => {
     assert.deepEqual((await readdir(folder)).filter((n) => n.endsWith('.part')), []);
   });
 
+  it('reads only the start of an error body when a download fails', async () => {
+    const huge = JSON.stringify({ message: 'x'.repeat(5_000_000) });
+    fake.state.fail.set('/courses/258674/files/34100002', { status: 500, body: huge });
+    const { json } = await cli('download', '258674', '34100002', '--out', path.join(dir, 'dl-error'));
+    fake.state.fail.delete('/courses/258674/files/34100002');
+    assert.match(json.failed[0].error, /failed with HTTP 500/);
+    assert.ok(json.failed[0].error.length < 1000, `error is ${json.failed[0].error.length} characters`);
+  });
+
   it('rejects an id that is not in the course', async () => {
     const { code, err } = await cli('download', '258674', '999');
     assert.equal(code, 2);

@@ -125,7 +125,7 @@ export class PolitoClient {
       const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.${randomUUID()}.part`);
       let bytes = 0;
       const res = await this.#authed('GET', apiPath, undefined, async (r) => {
-        if (r.status < 200 || r.status > 299 || !r.body) return readText(r);
+        if (r.status < 200 || r.status > 299 || !r.body) return readCapped(r, ERROR_BODY_MAX);
         const declared = Number(r.headers.get('content-length'));
         if (declared > maxBytes) {
           await r.body.cancel();
@@ -335,6 +335,25 @@ interface RawResponse {
 }
 
 const readText = async (res: Response): Promise<RawResponse> => ({ status: res.status, text: await res.text() });
+
+// An error answer to a download only needs its message, and the file host
+// isn't bound to keep it short.
+const ERROR_BODY_MAX = 64 * 1024;
+
+async function readCapped(res: Response, max: number): Promise<RawResponse> {
+  if (!res.body) return { status: res.status, text: '' };
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (size < max) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.length;
+  }
+  await reader.cancel();
+  return { status: res.status, text: Buffer.concat(chunks).subarray(0, max).toString('utf8') };
+}
 
 // A download that broke after some bytes had already arrived.
 export class DownloadFailed extends UpstreamError {
