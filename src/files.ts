@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { PolitoClient } from './polito.ts';
-import { TooLarge } from './polito.ts';
+import { DownloadFailed, TooLarge } from './polito.ts';
 
 // Upstream shapes, from the PoliTO student OpenAPI spec.
 interface UpstreamFile {
@@ -154,9 +154,9 @@ export async function downloadFiles(
       manifest[dest] = record;
       result.downloaded.push({ id: f.id, path: dest, bytes });
     } catch (err) {
+      // Bytes that came over the network count against the run, even when the file didn't make it.
+      if (err instanceof TooLarge || err instanceof DownloadFailed) budget = Math.max(0, budget - err.transferred);
       if (err instanceof TooLarge) {
-        // The bytes came over the network, so they count against the run.
-        budget = Math.max(0, budget - err.transferred);
         result.skipped.push({ id: f.id, path: dest, reason: err.message });
       } else {
         result.failed.push({ id: f.id, path: dest, error: (err as Error).message });

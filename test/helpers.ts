@@ -38,6 +38,8 @@ export async function startFakePolito() {
     fileSizes: new Map<string, number>(),
     // Send files without content-length, so only the bytes tell their size.
     hideLength: false,
+    // File id → bytes to send before the connection drops.
+    cutAfter: new Map<string, number>(),
   };
 
   const server = http.createServer((req, res) => {
@@ -82,6 +84,12 @@ export async function startFakePolito() {
         const headers: Record<string, string> = { 'content-type': 'application/octet-stream' };
         if (!state.hideLength) headers['content-length'] = String(size);
         res.writeHead(200, headers);
+        const cut = state.cutAfter.get(hosted[1]!);
+        if (cut !== undefined) {
+          // Send part of the file, then drop the connection.
+          res.write(Buffer.alloc(cut, 'x'), () => res.destroy());
+          return;
+        }
         res.end(Buffer.alloc(size, hosted[1]!.slice(-1)));
         return;
       }

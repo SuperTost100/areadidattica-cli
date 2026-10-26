@@ -143,13 +143,18 @@ export class PolitoClient {
         } catch (err) {
           await rm(tmp, { force: true });
           if (err instanceof TooLarge) throw err;
-          throw new UpstreamError(`${label}: ${(err as Error).message}`, 0);
+          throw new DownloadFailed(`${label}: ${(err as Error).message}`, bytes);
         }
         return { status: r.status, text: '' };
       }, DOWNLOAD_TIMEOUT_MS);
       // Raises for error statuses; a successful download has no body to parse.
       parseBody(res, label);
-      await rename(tmp, dest);
+      try {
+        await rename(tmp, dest);
+      } catch (err) {
+        await rm(tmp, { force: true });
+        throw new DownloadFailed(`could not save ${dest}: ${(err as NodeJS.ErrnoException).code ?? err}`, bytes);
+      }
       return { bytes };
     });
   }
@@ -330,6 +335,15 @@ interface RawResponse {
 }
 
 const readText = async (res: Response): Promise<RawResponse> => ({ status: res.status, text: await res.text() });
+
+// A download that broke after some bytes had already arrived.
+export class DownloadFailed extends UpstreamError {
+  transferred: number;
+  constructor(message: string, transferred: number) {
+    super(message, 0);
+    this.transferred = transferred;
+  }
+}
 
 // A download bigger than the caller allowed. Not an upstream failure, so it
 // doesn't set lastError.

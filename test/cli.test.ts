@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -180,6 +180,32 @@ describe('areadidattica command line', () => {
     assert.match(json.skipped[0].reason, /larger than 2 MB/);
     // The first file used up the 2 MB, so the second isn't fetched at all.
     assert.match(json.skipped[1].reason, /over the size limit \(0 MB left/);
+  });
+
+  it('counts the bytes of a broken download against the run limit too', async () => {
+    fake.state.hideLength = true;
+    fake.state.fileSizes.set('34100002', 3_000_000);
+    fake.state.cutAfter.set('34100002', 1_500_000);
+    fake.state.fileSizes.set('34100004', 1_000_000);
+    const { json } = await cli('download', '258674', '34100001', '--out', path.join(dir, 'dl-broken'), '--max-mb', '2');
+    fake.state.fileSizes.clear();
+    fake.state.cutAfter.clear();
+    fake.state.hideLength = false;
+    assert.equal(json.failed[0].id, '34100002');
+    // 1.5 MB of the 2 MB came over before the connection dropped, so the 1 MB file no longer fits.
+    assert.deepEqual(json.downloaded, []);
+    assert.match(json.skipped[0].reason, /larger than 0 MB|larger than 1 MB/);
+  });
+
+  it('removes the partial file when it cannot be put in place', async () => {
+    const out = path.join(dir, 'dl-rename');
+    const folder = path.join(out, 'System and device programming (258674)', 'Lezioni');
+    // A non-empty folder where the file should go makes the final rename fail.
+    await mkdir(path.join(folder, 'L01 Introduzione.pdf'), { recursive: true });
+    await writeFile(path.join(folder, 'L01 Introduzione.pdf', 'keep'), 'x');
+    const { json } = await cli('download', '258674', '34100002', '--out', out);
+    assert.equal(json.failed[0].id, '34100002');
+    assert.deepEqual((await readdir(folder)).filter((n) => n.endsWith('.part')), []);
   });
 
   it('rejects an id that is not in the course', async () => {
