@@ -121,7 +121,8 @@ export class PolitoClient {
     const label = `GET ${apiPath}`;
     return this.#tracked(async () => {
       // Hidden and unique: safeSegment strips leading dots, so no course file
-      // can have this name, and two runs never share one.
+      // can have this name, and two runs never share one. It's created with
+      // 'wx', so it never writes through a file or symlink already there.
       const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.${randomUUID()}.part`);
       let bytes = 0;
       const res = await this.#authed('GET', apiPath, undefined, async (r) => {
@@ -139,7 +140,7 @@ export class PolitoClient {
           },
         });
         try {
-          await pipeline(Readable.fromWeb(r.body as WebReadableStream), limit, createWriteStream(tmp, { mode: 0o600 }));
+          await pipeline(Readable.fromWeb(r.body as WebReadableStream), limit, createWriteStream(tmp, { mode: 0o600, flags: 'wx' }));
         } catch (err) {
           await rm(tmp, { force: true });
           if (err instanceof TooLarge) throw err;
