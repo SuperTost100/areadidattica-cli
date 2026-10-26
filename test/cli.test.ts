@@ -120,7 +120,7 @@ describe('areadidattica command line', () => {
     const out = path.join(dir, 'dl');
     const first = await cli('download', '258674', '34100001', '--out', out);
     assert.equal(first.code, 0);
-    const base = path.join(out, 'System and device programming', 'Lezioni');
+    const base = path.join(out, 'System and device programming (258674)', 'Lezioni');
     assert.deepEqual(
       first.json.downloaded.map((d: any) => [d.path, d.bytes]),
       [
@@ -142,7 +142,7 @@ describe('areadidattica command line', () => {
   it('keeps a file named like a path inside the course folder', async () => {
     const out = path.join(dir, 'dl-escape');
     const { json } = await cli('download', '258674', '34100006', '--out', out);
-    assert.equal(json.downloaded[0].path, path.join(out, 'System and device programming', '_.._escape.txt'));
+    assert.equal(json.downloaded[0].path, path.join(out, 'System and device programming (258674)', '_.._escape.txt'));
   });
 
   it('skips files over the size limit before downloading them', async () => {
@@ -163,7 +163,7 @@ describe('areadidattica command line', () => {
       fake.state.hideLength = false;
       assert.deepEqual(json.downloaded, []);
       assert.match(json.skipped[0].reason, /larger than 2 MB/);
-      const folder = path.join(out, 'System and device programming', 'Lezioni', 'Esercitazioni');
+      const folder = path.join(out, 'System and device programming (258674)', 'Lezioni', 'Esercitazioni');
       // No partial file is left behind.
       assert.deepEqual(await readdir(folder).catch(() => []), []);
     });

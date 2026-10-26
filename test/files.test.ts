@@ -49,4 +49,15 @@ describe('destinations', () => {
       path.join('Lezioni', 'a_b (4).pdf'),
     ]);
   });
+
+  it('never gives a generated name to a file that already has it', () => {
+    const where = destinations([
+      file('1', '', 'Slides.pdf'),
+      file('2', '', 'Slides.pdf'),
+      file('3', '', 'Slides (1).pdf'),
+    ]);
+    const paths = [...where.values()].map((p) => p.toLowerCase());
+    assert.equal(new Set(paths).size, 3, paths.join(', '));
+    assert.equal(where.get('3'), 'Slides (1).pdf');
+  });
 });

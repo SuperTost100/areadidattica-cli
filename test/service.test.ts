@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { API_TOKEN, PASSWORD, startFakePolito, startService } from './helpers.ts';
@@ -190,6 +190,24 @@ describe('login and token reuse', () => {
     assert.equal(fake.count('POST', '/auth/login'), 1);
     await second.close();
     await second.cleanup();
+  });
+
+  it('drops a token saved before sessions recorded their account', async () => {
+    const legacy = await startService(fake.baseUrl);
+    await writeFile(
+      path.join(legacy.dataDir, 'session.json'),
+      JSON.stringify({ clientId: 'c-1', token: 'tok-from-someone-else', loggedInAt: null, loginPausedUntil: 0, loginPauseReason: null }),
+    );
+    await legacy.close();
+    const restarted = await startService(fake.baseUrl, { dataDir: legacy.dataDir });
+    const logins = fake.count('POST', '/auth/login');
+    assert.equal((await restarted.call('GET', '/deadlines')).status, 200);
+    assert.equal(fake.count('POST', '/auth/login'), logins + 1);
+    assert.ok(!fake.state.requests.some((r) => r.auth === 'Bearer tok-from-someone-else'));
+    const saved = JSON.parse(await readFile(path.join(legacy.dataDir, 'session.json'), 'utf8'));
+    assert.equal(saved.username, 's123456');
+    await restarted.close();
+    await restarted.cleanup();
   });
 
   it('logs in again once on 401 and retries the request', async () => {

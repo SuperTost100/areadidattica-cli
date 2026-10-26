@@ -93,19 +93,25 @@ export function destinations(files: FileItem[]): Map<string, string> {
   const key = (folders: string[], name: string) => path.join(...folders, name).toLowerCase();
   const count = new Map<string, number>();
   for (const n of natural) count.set(key(n.folders, n.name), (count.get(key(n.folders, n.name)) ?? 0) + 1);
+  // Every name in use, natural or generated, so a generated name like
+  // "Slides (1).pdf" never lands on a file PoliTO already calls that.
+  const taken = new Set(natural.map((n) => key(n.folders, n.name)));
   const out = new Map<string, string>();
   for (const { f, folders, name } of natural) {
     let file = name;
     if (count.get(key(folders, name))! > 1) {
       const ext = path.extname(name);
-      file = `${name.slice(0, name.length - ext.length)} (${f.id})${ext}`;
+      const base = name.slice(0, name.length - ext.length);
+      file = `${base} (${f.id})${ext}`;
+      for (let n = 2; taken.has(key(folders, file)); n++) file = `${base} (${f.id}-${n})${ext}`;
+      taken.add(key(folders, file));
     }
     out.set(f.id, path.join(...folders, file));
   }
   return out;
 }
 
-// Downloads files into `<outDir>/<course>/<folders>/<name>`. A file is
+// Downloads files into `<outDir>/<course> (<id>)/<folders>/<name>`. A file is
 // skipped when the last download to its path was the same file with the same
 // checksum, and the run stops taking files once their listed sizes would
 // pass `maxBytes`.
@@ -125,7 +131,8 @@ export async function downloadFiles(
 ): Promise<DownloadResult> {
   const manifest = await readManifest(opts.manifestFile);
   const result: DownloadResult = { downloaded: [], skipped: [], failed: [] };
-  const courseDir = path.join(path.resolve(opts.outDir), safeSegment(opts.courseName, opts.courseId));
+  // The id keeps two courses with the same name apart.
+  const courseDir = path.join(path.resolve(opts.outDir), `${safeSegment(opts.courseName, 'course')} (${opts.courseId})`);
   const where = destinations(opts.allFiles ?? opts.files);
   let budget = opts.maxBytes;
 

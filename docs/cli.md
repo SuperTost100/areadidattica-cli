@@ -132,7 +132,7 @@ areadidattica files fisica
 ]
 ```
 
-`download` takes file ids and folder ids from that list. It saves each file as `<DIR>/<course>/<folder>/<name>`, where `DIR` is `~/Downloads/polito` unless `--out` or `AREADIDATTICA_DOWNLOADS` says otherwise, and prints the paths:
+`download` takes file ids and folder ids from that list. It saves each file as `<DIR>/<course> (<id>)/<folder>/<name>`, where `DIR` is `~/Downloads/polito` unless `--out` or `AREADIDATTICA_DOWNLOADS` says otherwise, and prints the paths:
 
 ```bash
 areadidattica download fisica 34204201
@@ -141,7 +141,7 @@ areadidattica download fisica 34204201
 ```json
 {
   "downloaded": [
-    { "id": "34204201", "path": "/home/you/Downloads/polito/Fisica I/Esami/Turni Quiz 16 ottobre 2026.pdf", "bytes": 24738 }
+    { "id": "34204201", "path": "/home/you/Downloads/polito/Fisica I (309950)/Esami/Turni Quiz 16 ottobre 2026.pdf", "bytes": 24738 }
   ],
   "skipped": [],
   "failed": []
@@ -150,7 +150,7 @@ areadidattica download fisica 34204201
 
 - **Unchanged files are skipped.** A file whose checksum matches the last download to the same path isn't fetched again. `--force` downloads it anyway.
 - **Size limit.** One run downloads at most 200 MB in total. A file that doesn't fit is skipped with the reason, before any byte is fetched. Raise the limit with `--max-mb`, for a videolecture for example.
-- **Safe paths.** Slashes and `..` in PoliTO's names become `_`, so a file always lands inside its course folder.
+- **Safe paths.** Slashes and `..` in PoliTO's names become `_`, so a file always lands inside its course folder. Two files that would get the same name get their id added, like `Slides (34100008).pdf`.
 
 ## Courses and timetable
 

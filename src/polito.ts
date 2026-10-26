@@ -69,10 +69,9 @@ export class PolitoClient {
   async init(): Promise<void> {
     try {
       const raw = JSON.parse(await readFile(this.#sessionFile, 'utf8'));
-      // Sessions saved before the account was recorded count as this account's.
-      const sameAccount =
-        (raw.username ?? this.#opts.username) === this.#opts.username &&
-        (raw.baseUrl ?? this.#opts.baseUrl) === this.#opts.baseUrl;
+      // Sessions saved before the account was recorded could belong to anyone,
+      // so they don't count as this account's.
+      const sameAccount = raw.username === this.#opts.username && raw.baseUrl === this.#opts.baseUrl;
       this.#session = {
         clientId: String(raw.clientId),
         username: this.#opts.username,

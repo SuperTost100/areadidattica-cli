@@ -197,7 +197,7 @@ const COMMANDS: Record<string, Command> = {
   },
   download: {
     usage: 'download <course> <file-or-folder-id>... [--out DIR] [--max-mb N] [--force]',
-    help: `Save files, or every file in a folder, under DIR/<course>/. Skips files unchanged since the last download. Stops at --max-mb in total (default ${DEFAULT_MAX_MB}).`,
+    help: `Save files, or every file in a folder, under DIR/<course> (<id>)/. Skips files unchanged since the last download. Stops at --max-mb in total (default ${DEFAULT_MAX_MB}).`,
     run: async (ctx) => {
       const c = await course(ctx);
       const ids = ctx.args.slice(1);
