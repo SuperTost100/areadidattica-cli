@@ -94,10 +94,17 @@ const query = (params: Record<string, string | undefined>): string => {
   return s ? `?${s}` : '';
 };
 
+const ROME_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' });
+
 // Today plus `days`, as a calendar date in Turin.
 function romeDate(days: number): string {
-  const d = new Date(Date.now() + days * 86_400_000);
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(d);
+  return ROME_DAY.format(new Date(Date.now() + days * 86_400_000));
+}
+
+// The day a timestamp falls on in Turin, whatever offset PoliTO sent it with.
+function romeDay(timestamp: string): string {
+  const t = Date.parse(timestamp);
+  return Number.isNaN(t) ? timestamp.slice(0, 10) : ROME_DAY.format(t);
 }
 
 const COMMANDS: Record<string, Command> = {
@@ -194,7 +201,7 @@ const COMMANDS: Record<string, Command> = {
           continue;
         }
         const files = flattenFiles(tree)
-          .filter((f) => !since || Date.parse(f.createdAt) >= Date.parse(since))
+          .filter((f) => !since || romeDay(f.createdAt) >= since)
           .filter((f) => !search || `${f.folder}/${f.name}`.toLowerCase().includes(search));
         out.push(...files.map((f) => ({ courseId: c.id, course: c.name, ...f })));
       }

@@ -92,6 +92,7 @@ describe('areadidattica command line', () => {
   });
 
   it('filters files by date and by name, across every course', async () => {
+    // E01 was uploaded at 01:35 Rome time on 2026-10-16, which is still the 15th in UTC.
     const since = await cli('files', '--since', '2026-10-16');
     assert.deepEqual(since.json.map((f: any) => f.id), ['34100004', '34100006', '34100007']);
     const search = await cli('files', '--search', 'esercitazioni');

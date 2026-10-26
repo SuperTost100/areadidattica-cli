@@ -11,7 +11,7 @@
           "id": "34100003",
           "name": "Esercitazioni",
           "files": [
-            { "type": "file", "id": "34100004", "name": "E01 Processi.pdf", "sizeInKiloBytes": 1, "mimeType": "application/pdf", "createdAt": "2026-10-16T11:35:28+02:00", "checksum": "2222222222222222222222222222222222222222" }
+            { "type": "file", "id": "34100004", "name": "E01 Processi.pdf", "sizeInKiloBytes": 1, "mimeType": "application/pdf", "createdAt": "2026-10-16T01:35:28+02:00", "checksum": "2222222222222222222222222222222222222222" }
           ]
         }
       ]
