@@ -93,13 +93,17 @@ export function destinations(files: FileItem[]): Map<string, string> {
   const key = (folders: string[], name: string) => path.join(...folders, name).toLowerCase();
   const count = new Map<string, number>();
   for (const n of natural) count.set(key(n.folders, n.name), (count.get(key(n.folders, n.name)) ?? 0) + 1);
-  // Every name in use, natural or generated, so a generated name like
-  // "Slides (1).pdf" never lands on a file PoliTO already calls that.
-  const taken = new Set(natural.map((n) => key(n.folders, n.name)));
+  // A file can't have the path of a folder, like "Notes" next to "Notes/A.pdf".
+  const folderPaths = new Set(
+    natural.flatMap((n) => n.folders.map((_, i) => path.join(...n.folders.slice(0, i + 1)).toLowerCase())),
+  );
+  // Every path in use, natural, generated or a folder, so a generated name
+  // like "Slides (1).pdf" never lands on one PoliTO already has.
+  const taken = new Set([...natural.map((n) => key(n.folders, n.name)), ...folderPaths]);
   const out = new Map<string, string>();
   for (const { f, folders, name } of natural) {
     let file = name;
-    if (count.get(key(folders, name))! > 1) {
+    if (count.get(key(folders, name))! > 1 || folderPaths.has(key(folders, name))) {
       const ext = path.extname(name);
       const base = name.slice(0, name.length - ext.length);
       file = `${base} (${f.id})${ext}`;

@@ -60,4 +60,11 @@ describe('destinations', () => {
     assert.equal(new Set(paths).size, 3, paths.join(', '));
     assert.equal(where.get('3'), 'Slides (1).pdf');
   });
+
+  it('renames a file that would take the name of a folder', () => {
+    const where = destinations([file('1', '', 'Notes.'), file('2', 'Notes', 'A.pdf'), file('3', 'Esami/notes', 'B.pdf'), file('4', 'Esami', 'Notes')]);
+    assert.equal(where.get('1'), 'Notes (1)');
+    assert.equal(where.get('2'), path.join('Notes', 'A.pdf'));
+    assert.equal(where.get('4'), path.join('Esami', 'Notes (4)'));
+  });
 });
