@@ -6,7 +6,7 @@ import path from 'node:path';
 import { parseArgs, parseEnv } from 'node:util';
 import { loadPolitoConfig } from './config.ts';
 import { downloadFiles, flattenFiles, type UpstreamEntry } from './files.ts';
-import { htmlToText, type CourseNotice } from './normalize.ts';
+import { htmlToText, romeDate, romeDay, type CourseNotice } from './normalize.ts';
 import { PolitoClient } from './polito.ts';
 import { BadRequest, Service } from './service.ts';
 
@@ -93,19 +93,6 @@ const query = (params: Record<string, string | undefined>): string => {
   const s = q.toString();
   return s ? `?${s}` : '';
 };
-
-const ROME_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' });
-
-// Today plus `days`, as a calendar date in Turin.
-function romeDate(days: number): string {
-  return ROME_DAY.format(new Date(Date.now() + days * 86_400_000));
-}
-
-// The day a timestamp falls on in Turin, whatever offset PoliTO sent it with.
-function romeDay(timestamp: string): string {
-  const t = Date.parse(timestamp);
-  return Number.isNaN(t) ? timestamp.slice(0, 10) : ROME_DAY.format(t);
-}
 
 const COMMANDS: Record<string, Command> = {
   help: {

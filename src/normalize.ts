@@ -216,3 +216,18 @@ export function htmlToText(html: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+const ROME_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' });
+
+// Today in Turin plus `days` calendar days, as YYYY-MM-DD. Adding days to the
+// date rather than hours to the instant keeps it right when the clocks change.
+export function romeDate(days: number, now = Date.now()): string {
+  const [y, m, d] = ROME_DAY.format(now).split('-').map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d! + days)).toISOString().slice(0, 10);
+}
+
+// The day a timestamp falls on in Turin, whatever offset PoliTO sent it with.
+export function romeDay(timestamp: string): string {
+  const t = Date.parse(timestamp);
+  return Number.isNaN(t) ? timestamp.slice(0, 10) : ROME_DAY.format(t);
+}

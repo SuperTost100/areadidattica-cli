@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { courseFromTitle, htmlToText, parseNoticeScope, pickNotice } from '../src/normalize.ts';
+import { courseFromTitle, htmlToText, parseNoticeScope, pickNotice, romeDate, romeDay } from '../src/normalize.ts';
 
 describe('htmlToText', () => {
   it('keeps the Italian wording and drops only markup', () => {
@@ -69,5 +69,26 @@ describe('courseFromTitle', () => {
     assert.equal(courseFromTitle('Nuovo avviso da Basi di dati'), 'Basi di dati');
     assert.equal(courseFromTitle('Nuovo avviso nel Corso di Analisi matematica II'), 'Analisi matematica II');
     assert.equal(courseFromTitle('Chiusura sedi'), null);
+  });
+});
+
+describe('romeDate', () => {
+  it('adds calendar days in Turin, also on the night the clocks go back', () => {
+    // 00:30 in Turin on 2026-10-25, the day that lasts 25 hours.
+    const now = Date.parse('2026-10-24T22:30:00Z');
+    assert.equal(romeDate(0, now), '2026-10-25');
+    assert.equal(romeDate(1, now), '2026-10-26');
+    assert.equal(romeDate(30, now), '2026-11-24');
+  });
+
+  it('crosses month and year ends', () => {
+    assert.equal(romeDate(1, Date.parse('2026-12-31T12:00:00Z')), '2027-01-01');
+  });
+});
+
+describe('romeDay', () => {
+  it('gives the day in Turin whatever the offset', () => {
+    assert.equal(romeDay('2026-10-16T01:35:28+02:00'), '2026-10-16');
+    assert.equal(romeDay('2026-10-15T23:35:28Z'), '2026-10-16');
   });
 });
