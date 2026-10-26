@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { PolitoClient } from './polito.ts';
@@ -78,15 +79,44 @@ export interface DownloadResult {
   failed: { id: string; path: string; error: string }[];
 }
 
-// Downloads files into `<outDir>/<course>/<folders>/<name>`. A file whose
-// checksum matches the last download of the same path is skipped, and the
-// run stops taking files once their listed sizes would pass `maxBytes`.
+// Where each file of a course goes, relative to the course folder. PoliTO
+// allows two files with the same name in one folder, and different names can
+// clean up to the same one, so colliding files get their id in the name.
+// Pass the whole course tree, so a file's path doesn't depend on which other
+// files a run asked for.
+export function destinations(files: FileItem[]): Map<string, string> {
+  const natural = files.map((f) => {
+    const folders = f.folder ? f.folder.split('/').map((s, i) => safeSegment(s, `folder-${i}`)) : [];
+    return { f, folders, name: safeSegment(f.name, f.id) };
+  });
+  // Lowercase, because macOS and Windows treat Slides.pdf and slides.pdf as one file.
+  const key = (folders: string[], name: string) => path.join(...folders, name).toLowerCase();
+  const count = new Map<string, number>();
+  for (const n of natural) count.set(key(n.folders, n.name), (count.get(key(n.folders, n.name)) ?? 0) + 1);
+  const out = new Map<string, string>();
+  for (const { f, folders, name } of natural) {
+    let file = name;
+    if (count.get(key(folders, name))! > 1) {
+      const ext = path.extname(name);
+      file = `${name.slice(0, name.length - ext.length)} (${f.id})${ext}`;
+    }
+    out.set(f.id, path.join(...folders, file));
+  }
+  return out;
+}
+
+// Downloads files into `<outDir>/<course>/<folders>/<name>`. A file is
+// skipped when the last download to its path was the same file with the same
+// checksum, and the run stops taking files once their listed sizes would
+// pass `maxBytes`.
 export async function downloadFiles(
   client: PolitoClient,
   opts: {
     courseId: string;
     courseName: string;
     files: FileItem[];
+    // Every file in the course, to keep paths stable. Defaults to `files`.
+    allFiles?: FileItem[];
     outDir: string;
     maxBytes: number;
     manifestFile: string;
@@ -96,12 +126,14 @@ export async function downloadFiles(
   const manifest = await readManifest(opts.manifestFile);
   const result: DownloadResult = { downloaded: [], skipped: [], failed: [] };
   const courseDir = path.join(path.resolve(opts.outDir), safeSegment(opts.courseName, opts.courseId));
+  const where = destinations(opts.allFiles ?? opts.files);
   let budget = opts.maxBytes;
 
   for (const f of opts.files) {
-    const folders = f.folder ? f.folder.split('/').map((s, i) => safeSegment(s, `folder-${i}`)) : [];
-    const dest = path.join(courseDir, ...folders, safeSegment(f.name, f.id));
-    if (!opts.force && manifest[dest] === f.checksum && (await exists(dest))) {
+    const dest = path.join(courseDir, where.get(f.id) ?? safeSegment(f.name, f.id));
+    // Keyed by path, with the id, so another file landing on the same path never counts as unchanged.
+    const record = `${f.id}:${f.checksum}`;
+    if (!opts.force && manifest[dest] === record && (await exists(dest))) {
       result.skipped.push({ id: f.id, path: dest, reason: 'unchanged since the last download' });
       continue;
     }
@@ -112,7 +144,7 @@ export async function downloadFiles(
     try {
       const { bytes } = await client.download(`/courses/${opts.courseId}/files/${encodeURIComponent(f.id)}`, dest, budget);
       budget -= bytes;
-      manifest[dest] = f.checksum;
+      manifest[dest] = record;
       result.downloaded.push({ id: f.id, path: dest, bytes });
     } catch (err) {
       if (err instanceof TooLarge) {
@@ -141,7 +173,9 @@ async function readManifest(file: string): Promise<Record<string, string>> {
 
 async function writeManifest(file: string, manifest: Record<string, string>): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
-  const tmp = `${file}.tmp`;
+  // shortcut: two runs at once each write the whole manifest and the last one
+  // wins, which only costs a repeat download. Lock the file if that matters.
+  const tmp = `${file}.${randomUUID()}.tmp`;
   await writeFile(tmp, JSON.stringify(manifest, null, 2), { mode: 0o600 });
   await rename(tmp, file);
 }

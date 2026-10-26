@@ -218,6 +218,7 @@ const COMMANDS: Record<string, Command> = {
       const maxMb = Number(ctx.opts['max-mb'] ?? DEFAULT_MAX_MB);
       if (!(maxMb > 0)) throw new Usage('--max-mb must be a positive number');
       const tree = await data<UpstreamEntry[]>(ctx, `/courses/${c.id}/files`);
+      const allFiles = flattenFiles(tree);
       const files = [];
       for (const fileId of ids) {
         const found = flattenFiles(tree, fileId);
@@ -228,6 +229,7 @@ const COMMANDS: Record<string, Command> = {
         courseId: c.id,
         courseName: c.name,
         files: [...new Map(files.map((f) => [f.id, f])).values()],
+        allFiles,
         outDir: downloadDir(ctx),
         maxBytes: maxMb * 1e6,
         manifestFile: path.join(ctx.dataDir, 'downloads.json'),

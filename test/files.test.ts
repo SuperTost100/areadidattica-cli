@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { describe, it } from 'node:test';
-import { safeSegment } from '../src/files.ts';
+import { destinations, safeSegment } from '../src/files.ts';
 
 describe('safeSegment', () => {
   it('keeps ordinary names as they are', () => {
@@ -20,5 +21,32 @@ describe('safeSegment', () => {
 
   it('caps long names', () => {
     assert.equal(safeSegment('a'.repeat(400), 'x').length, 150);
+  });
+});
+
+describe('destinations', () => {
+  const file = (id: string, folder: string, name: string) => ({
+    id, folder, name, sizeKB: 1, mimeType: 'application/pdf', createdAt: '2026-10-01T10:00:00Z', checksum: id,
+  });
+
+  it('keeps names that are unique in their folder', () => {
+    const where = destinations([file('1', 'Lezioni', 'Slides.pdf'), file('2', 'Esami', 'Slides.pdf')]);
+    assert.equal(where.get('1'), path.join('Lezioni', 'Slides.pdf'));
+    assert.equal(where.get('2'), path.join('Esami', 'Slides.pdf'));
+  });
+
+  it('adds the id to files that would land on the same path', () => {
+    const where = destinations([
+      file('1', 'Lezioni', 'Slides.pdf'),
+      file('2', 'Lezioni', 'slides.pdf'),
+      file('3', 'Lezioni', 'a/b.pdf'),
+      file('4', 'Lezioni', 'a_b.pdf'),
+    ]);
+    assert.deepEqual([...where.values()], [
+      path.join('Lezioni', 'Slides (1).pdf'),
+      path.join('Lezioni', 'slides (2).pdf'),
+      path.join('Lezioni', 'a_b (3).pdf'),
+      path.join('Lezioni', 'a_b (4).pdf'),
+    ]);
   });
 });

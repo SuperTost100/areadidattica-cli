@@ -17,6 +17,9 @@ export class UpstreamError extends Error {
 
 interface Session {
   clientId: string;
+  // The account and API the token belongs to.
+  username: string;
+  baseUrl: string;
   token: string | null;
   loggedInAt: string | null;
   // Epoch ms; no login attempts before this.
@@ -66,17 +69,27 @@ export class PolitoClient {
   async init(): Promise<void> {
     try {
       const raw = JSON.parse(await readFile(this.#sessionFile, 'utf8'));
+      // Sessions saved before the account was recorded count as this account's.
+      const sameAccount =
+        (raw.username ?? this.#opts.username) === this.#opts.username &&
+        (raw.baseUrl ?? this.#opts.baseUrl) === this.#opts.baseUrl;
       this.#session = {
         clientId: String(raw.clientId),
-        token: raw.token ?? null,
-        loggedInAt: raw.loggedInAt ?? null,
-        loginPausedUntil: Number(raw.loginPausedUntil) || 0,
-        loginPauseReason: raw.loginPauseReason ?? null,
+        username: this.#opts.username,
+        baseUrl: this.#opts.baseUrl,
+        // A token or a login pause from another account must not carry over:
+        // a write would otherwise land on the account the token belongs to.
+        token: sameAccount ? (raw.token ?? null) : null,
+        loggedInAt: sameAccount ? (raw.loggedInAt ?? null) : null,
+        loginPausedUntil: sameAccount ? Number(raw.loginPausedUntil) || 0 : 0,
+        loginPauseReason: sameAccount ? (raw.loginPauseReason ?? null) : null,
       };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       this.#session = {
         clientId: randomUUID(),
+        username: this.#opts.username,
+        baseUrl: this.#opts.baseUrl,
         token: null,
         loggedInAt: null,
         loginPausedUntil: 0,
@@ -107,7 +120,9 @@ export class PolitoClient {
   async download(apiPath: string, dest: string, maxBytes: number): Promise<{ bytes: number }> {
     const label = `GET ${apiPath}`;
     return this.#tracked(async () => {
-      const tmp = `${dest}.part`;
+      // Hidden and unique: safeSegment strips leading dots, so no course file
+      // can have this name, and two runs never share one.
+      const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.${randomUUID()}.part`);
       let bytes = 0;
       const res = await this.#authed('GET', apiPath, undefined, async (r) => {
         if (r.status < 200 || r.status > 299 || !r.body) return readText(r);
@@ -228,6 +243,7 @@ export class PolitoClient {
     if (!token) throw new UpstreamError('login: response has no token', res.status);
 
     this.#session = {
+      ...session,
       clientId: body.data?.clientId || session.clientId,
       token,
       loggedInAt: new Date().toISOString(),
@@ -254,7 +270,7 @@ export class PolitoClient {
   async #saveSession(): Promise<void> {
     try {
       await mkdir(this.#opts.dataDir, { recursive: true, mode: 0o700 });
-      const tmp = `${this.#sessionFile}.tmp`;
+      const tmp = `${this.#sessionFile}.${randomUUID()}.tmp`;
       await writeFile(tmp, JSON.stringify(this.#session, null, 2), { mode: 0o600 });
       await rename(tmp, this.#sessionFile);
     } catch (err) {

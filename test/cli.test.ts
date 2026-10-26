@@ -64,6 +64,20 @@ describe('areadidattica command line', () => {
     assert.equal(session.mode & 0o777, 0o600);
   });
 
+  it('drops the stored token when the configured account changes', async () => {
+    const logins = () => fake.count('POST', '/auth/login');
+    const before = logins();
+    assert.equal((await cli('exams')).code, 0);
+    assert.equal(logins(), before, 'same account reuses the token');
+
+    assert.equal((await cliEnv({ ...env, POLITO_USERNAME: 's999999' }, 'exams')).code, 0);
+    assert.equal(logins(), before + 1);
+    assert.equal(fake.state.requests.findLast((r) => r.path === '/auth/login')!.body.username, 's999999');
+
+    assert.equal((await cli('exams')).code, 0);
+    assert.equal(logins(), before + 2, 'switching back logs in as the configured account again');
+  });
+
   it('finds a course by id, shortcode or part of its name, and its modules', async () => {
     for (const q of ['258674', '01nyhov', 'device prog']) {
       const { json } = await cli('notices', q);
