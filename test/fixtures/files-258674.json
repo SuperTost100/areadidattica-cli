@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "type": "directory",
+      "id": "34100001",
+      "name": "Lezioni",
+      "files": [
+        { "type": "file", "id": "34100002", "name": "L01 Introduzione.pdf", "sizeInKiloBytes": 2, "mimeType": "application/pdf", "createdAt": "2026-09-24T11:10:44+02:00", "checksum": "1111111111111111111111111111111111111111" },
+        {
+          "type": "directory",
+          "id": "34100003",
+          "name": "Esercitazioni",
+          "files": [
+            { "type": "file", "id": "34100004", "name": "E01 Processi.pdf", "sizeInKiloBytes": 1, "mimeType": "application/pdf", "createdAt": "2026-10-16T11:35:28+02:00", "checksum": "2222222222222222222222222222222222222222" }
+          ]
+        }
+      ]
+    },
+    { "type": "directory", "id": "34100005", "name": "Vuota", "files": [] },
+    { "type": "file", "id": "34100006", "name": "../../escape.txt", "sizeInKiloBytes": 1, "mimeType": "text/plain", "createdAt": "2026-10-20T09:00:00+02:00", "checksum": "3333333333333333333333333333333333333333" },
+    { "type": "file", "id": "34100007", "name": "Videolezione.mp4", "sizeInKiloBytes": 300000, "mimeType": "video/mp4", "createdAt": "2026-10-21T09:00:00+02:00", "checksum": "4444444444444444444444444444444444444444" }
+  ]
+}

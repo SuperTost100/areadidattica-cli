@@ -5,8 +5,8 @@
 <h1 align="center">areadidattica</h1>
 
 <p align="center">
-  Your Politecnico di Torino course avvisi, school messages and deadlines as a small JSON API on your own computer.<br>
-  A dashboard, a bot or a script reads them and marks them read.
+  Your Politecnico di Torino avvisi, messages, deadlines, course files, timetable, exams and grades, as JSON on your own computer.<br>
+  A command for agents and scripts, and a small local API for dashboards.
 </p>
 
 <p align="center">
@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="#start">Start</a> ·
+  <a href="docs/cli.md">Command line</a> ·
   <a href="docs/api.md">API reference</a> ·
   <a href="#your-data">Your data</a>
 </p>
@@ -41,8 +42,9 @@ It runs as one Docker container. Your password stays in a `.env` file on your ma
 3. **Keeps the text readable.** The Italian stays as the teacher wrote it. HTML becomes plain text: links turn into `label (url)`, and a table becomes one line per row with the cells split by tabs, so an exam timetable can be shown as a table again.
 4. **Marks things read.** `POST /items/{id}/read` marks an avviso or message read on PoliTO, so the phone app stops counting it too.
 5. **Stays gentle on PoliTO.** It makes one call at a time, at least 250 ms apart, and caches course notice lists for 5 minutes.
+6. **Reads the rest from the command line.** The `areadidattica` command lists and downloads course files, and reads the timetable, exams, grades, bookings and everything else the PoliTO app shows. Booking exams and accepting grades also work, but only with `--allow-writes`.
 
-The [API reference](docs/api.md) has every endpoint and field.
+The [API reference](docs/api.md) has every endpoint and field, and the [command line guide](docs/cli.md) has every command.
 
 ## Start
 
@@ -89,6 +91,19 @@ PoliTO runs a public mock of the same API, which accepts any login and answers w
 POLITO_BASE_URL=https://app.didattica.polito.it/mock/api
 ```
 
+## Use it from the command line
+
+An AI agent, like a Grok Bot, or a script can run `areadidattica` directly, without Docker or the server. It needs Node.js 24 and your PoliTO login in the environment or in `~/.config/areadidattica/env`:
+
+```bash
+git clone https://github.com/SuperTost100/areadidattica-cli.git ~/areadidattica
+mkdir -p ~/.local/bin
+ln -sf ~/areadidattica/bin/areadidattica ~/.local/bin/areadidattica
+areadidattica files fisica --since 2026-10-20
+```
+
+Every command prints JSON. The [command line guide](docs/cli.md) covers the install step by step, every command, and how downloads and the write flag work.
+
 ## Use it with Grok Bot Dashboard
 
 [Grok Bot Dashboard](https://github.com/SuperTost100/Grok-Bot-Dashboard) reads areadidattica directly. Unread avvisi become cards with the course name and a real table for timetables, and tapping "Mark as read" there marks them read here. Its README has the three lines to add to its `.env`.
@@ -100,7 +115,9 @@ Everything stays in this folder: your credentials in `.env`, and the session tok
 - **Calls to PoliTO.** Login, notifications, messages, course notices, the course list and deadlines, all to `app.didattica.polito.it`, only when something calls this API.
 - **Mark as read.** One call to PoliTO per item you mark read.
 
-The server logs one line per request (method, path, status, time) and nothing else. It sends no telemetry.
+The command line keeps the same things elsewhere: your credentials in `~/.config/areadidattica/env` (or the environment), the token in `~/.local/state/areadidattica/session.json`, and downloads in `~/Downloads/polito`. It calls PoliTO only for the command you run.
+
+The server logs one line per request (method, path, status, time) and nothing else. Neither sends telemetry.
 
 ## Does it sign you out of the phone app?
 
@@ -137,7 +154,7 @@ Set these in `.env`. [`.env.example`](.env.example) has the template.
 
 ```bash
 npm ci
-npm test            # 39 tests against a fake PoliTO server, no network
+npm test            # 60 tests against a fake PoliTO server, no network
 npm run typecheck
 ```
 

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { Readable, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 
 export class UpstreamError extends Error {
   // Upstream HTTP status, or 0 when the request never got a response.
@@ -35,6 +39,8 @@ export interface PolitoClientOptions {
 // After a rejected login, wait this long before trying again so a wrong
 // password can't hammer the PoliTO login and lock the account.
 const LOGIN_BACKOFF_MS = 5 * 60 * 1000;
+// A download reads the whole file inside the call, so it gets longer than a JSON call.
+const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 
 export class PolitoClient {
   lastError: string | null = null;
@@ -87,32 +93,89 @@ export class PolitoClient {
     return this.request<T>('PUT', apiPath);
   }
 
-  // Sends an authenticated request. Logs in when there is no token yet, and
-  // logs in again once if PoliTO answers 401.
-  async request<T>(method: string, apiPath: string): Promise<T> {
+  // Sends an authenticated request and returns the parsed JSON body.
+  async request<T>(method: string, apiPath: string, body?: unknown): Promise<T> {
     const label = `${method} ${apiPath}`;
+    return this.#tracked(async () => {
+      const res = await this.#authed(method, apiPath, body, readText);
+      return parseBody(res, label) as T;
+    });
+  }
+
+  // Downloads a file into `dest`, following PoliTO's redirect to the file.
+  // Stops and deletes the partial file once it passes `maxBytes`.
+  async download(apiPath: string, dest: string, maxBytes: number): Promise<{ bytes: number }> {
+    const label = `GET ${apiPath}`;
+    return this.#tracked(async () => {
+      const tmp = `${dest}.part`;
+      let bytes = 0;
+      const res = await this.#authed('GET', apiPath, undefined, async (r) => {
+        if (r.status < 200 || r.status > 299 || !r.body) return readText(r);
+        const declared = Number(r.headers.get('content-length'));
+        if (declared > maxBytes) {
+          await r.body.cancel();
+          throw new TooLarge(label, maxBytes);
+        }
+        await mkdir(path.dirname(dest), { recursive: true });
+        const limit = new Transform({
+          transform(chunk: Buffer, _enc, done) {
+            bytes += chunk.length;
+            done(bytes > maxBytes ? new TooLarge(label, maxBytes) : null, chunk);
+          },
+        });
+        try {
+          await pipeline(Readable.fromWeb(r.body as WebReadableStream), limit, createWriteStream(tmp, { mode: 0o600 }));
+        } catch (err) {
+          await rm(tmp, { force: true });
+          if (err instanceof TooLarge) throw err;
+          throw new UpstreamError(`${label}: ${(err as Error).message}`, 0);
+        }
+        return { status: r.status, text: '' };
+      }, DOWNLOAD_TIMEOUT_MS);
+      // Raises for error statuses; a successful download has no body to parse.
+      parseBody(res, label);
+      await rename(tmp, dest);
+      return { bytes };
+    });
+  }
+
+  // Records the outcome in lastError, which /health and `status` report.
+  async #tracked<T>(fn: () => Promise<T>): Promise<T> {
     try {
-      const stored = this.#session?.token ?? null;
-      let token = stored ?? (await this.login());
-      let res = await this.#send(method, apiPath, token);
-      if (res.status === 401 && stored) {
-        // Another request may already have replaced the expired token.
-        const current = this.#session?.token;
-        token = current && current !== stored ? current : await this.login();
-        res = await this.#send(method, apiPath, token);
-      }
-      if (res.status === 401) {
-        // PoliTO refused a token it just issued. Logging in again on every
-        // request would only pile up sessions, so pause instead.
-        await this.#pauseLogins(`${label} refused a new token with HTTP 401`);
-      }
-      const body = parseBody(res, label);
+      const result = await fn();
       this.lastError = null;
-      return body as T;
+      return result;
     } catch (err) {
-      this.lastError = (err as Error).message;
+      if (!(err instanceof TooLarge)) this.lastError = (err as Error).message;
       throw err;
     }
+  }
+
+  // Logs in when there is no token yet, and logs in again once if PoliTO
+  // answers 401.
+  async #authed(
+    method: string,
+    apiPath: string,
+    body: unknown,
+    read: (res: Response) => Promise<RawResponse>,
+    timeoutMs?: number,
+  ): Promise<RawResponse> {
+    const label = `${method} ${apiPath}`;
+    const stored = this.#session?.token ?? null;
+    let token = stored ?? (await this.login());
+    let res = await this.#send(method, apiPath, token, body, read, timeoutMs);
+    if (res.status === 401 && stored) {
+      // Another request may already have replaced the expired token.
+      const current = this.#session?.token;
+      token = current && current !== stored ? current : await this.login();
+      res = await this.#send(method, apiPath, token, body, read, timeoutMs);
+    }
+    if (res.status === 401) {
+      // PoliTO refused a token it just issued. Logging in again on every
+      // request would only pile up sessions, so pause instead.
+      await this.#pauseLogins(`${label} refused a new token with HTTP 401`);
+    }
+    return res;
   }
 
   // Logs in and stores the token. Concurrent callers share one login.
@@ -154,7 +217,7 @@ export class PolitoClient {
         manufacturer: 'self-hosted',
         toothPicCompatible: false,
       },
-    });
+    }, readText);
     if (res.status >= 400 && res.status < 500) {
       await this.#pauseLogins(`login rejected with HTTP ${res.status}`);
     }
@@ -190,7 +253,7 @@ export class PolitoClient {
   // A failed write keeps the session in memory only; the request still succeeds.
   async #saveSession(): Promise<void> {
     try {
-      await mkdir(this.#opts.dataDir, { recursive: true });
+      await mkdir(this.#opts.dataDir, { recursive: true, mode: 0o700 });
       const tmp = `${this.#sessionFile}.tmp`;
       await writeFile(tmp, JSON.stringify(this.#session, null, 2), { mode: 0o600 });
       await rename(tmp, this.#sessionFile);
@@ -206,7 +269,9 @@ export class PolitoClient {
     method: string,
     apiPath: string,
     token: string | null,
-    body?: unknown,
+    body: unknown,
+    read: (res: Response) => Promise<RawResponse>,
+    timeoutMs = this.#opts.timeoutMs ?? 20_000,
   ): Promise<RawResponse> {
     const run = async () => {
       const wait = this.#lastCallAt + (this.#opts.gapMs ?? 0) - Date.now();
@@ -223,12 +288,16 @@ export class PolitoClient {
           method,
           headers,
           body: body === undefined ? undefined : JSON.stringify(body),
-          signal: AbortSignal.timeout(this.#opts.timeoutMs ?? 20_000),
+          signal: AbortSignal.timeout(timeoutMs),
         });
-        return { status: res.status, text: await res.text() };
+        return await read(res);
       } catch (err) {
+        if (err instanceof UpstreamError || err instanceof TooLarge) throw err;
         const label = apiPath === '/auth/login' ? 'login' : `${method} ${apiPath}`;
-        throw new UpstreamError(`${label}: ${(err as Error).message}`, 0);
+        // fetch says only "fetch failed"; the cause says why (ECONNREFUSED, ENOTFOUND, a timeout).
+        const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+        const why = cause ? ` (${cause.code ?? cause.message})` : '';
+        throw new UpstreamError(`${label}: ${(err as Error).message}${why}`, 0);
       } finally {
         this.#lastCallAt = Date.now();
       }
@@ -242,6 +311,16 @@ export class PolitoClient {
 interface RawResponse {
   status: number;
   text: string;
+}
+
+const readText = async (res: Response): Promise<RawResponse> => ({ status: res.status, text: await res.text() });
+
+// A download bigger than the caller allowed. Not an upstream failure, so it
+// doesn't set lastError.
+export class TooLarge extends Error {
+  constructor(label: string, maxBytes: number) {
+    super(`${label}: file is larger than ${Math.round(maxBytes / 1e6)} MB`);
+  }
 }
 
 function parseBody({ status, text }: RawResponse, label: string): unknown {

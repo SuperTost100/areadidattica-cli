@@ -1,0 +1,5 @@
+{
+  "data": [
+    { "id": 887981, "courseId": 258674, "courseShortcode": "01NYHOV", "courseName": "System and device programming", "teacherId": 2893, "type": "Scritto", "status": "available", "bookingStartsAt": "2026-12-01T00:00:00Z", "bookingEndsAt": "2027-01-20T23:59:00Z", "examStartsAt": "2027-01-28T08:30:00Z", "examEndsAt": "2027-01-28T11:30:00Z", "bookedCount": 120, "availableCount": 80, "question": null, "feedback": null, "isReschedulable": false, "notes": null, "moduleNumber": 0, "requestReason": null, "requestDetails": null, "places": [] }
+  ]
+}

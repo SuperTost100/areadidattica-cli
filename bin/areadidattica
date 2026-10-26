@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs the areadidattica command line. Put it on your PATH with:
+#   ln -s "$PWD/bin/areadidattica" ~/.local/bin/areadidattica
+dir=$(dirname "$(readlink -f "$0")")
+exec node "$dir/../src/cli.ts" "$@"
