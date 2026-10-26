@@ -148,6 +148,8 @@ export async function downloadFiles(
       result.downloaded.push({ id: f.id, path: dest, bytes });
     } catch (err) {
       if (err instanceof TooLarge) {
+        // The bytes came over the network, so they count against the run.
+        budget = Math.max(0, budget - err.transferred);
         result.skipped.push({ id: f.id, path: dest, reason: err.message });
       } else {
         result.failed.push({ id: f.id, path: dest, error: (err as Error).message });

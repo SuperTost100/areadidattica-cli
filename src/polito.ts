@@ -135,7 +135,7 @@ export class PolitoClient {
         const limit = new Transform({
           transform(chunk: Buffer, _enc, done) {
             bytes += chunk.length;
-            done(bytes > maxBytes ? new TooLarge(label, maxBytes) : null, chunk);
+            done(bytes > maxBytes ? new TooLarge(label, maxBytes, bytes) : null, chunk);
           },
         });
         try {
@@ -334,8 +334,11 @@ const readText = async (res: Response): Promise<RawResponse> => ({ status: res.s
 // A download bigger than the caller allowed. Not an upstream failure, so it
 // doesn't set lastError.
 export class TooLarge extends Error {
-  constructor(label: string, maxBytes: number) {
+  // Bytes already received when the download stopped.
+  transferred: number;
+  constructor(label: string, maxBytes: number, transferred = 0) {
     super(`${label}: file is larger than ${Math.round(maxBytes / 1e6)} MB`);
+    this.transferred = transferred;
   }
 }
 

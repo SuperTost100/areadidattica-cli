@@ -169,6 +169,19 @@ describe('areadidattica command line', () => {
     });
   }
 
+  it('counts the bytes of a stopped download against the run limit', async () => {
+    fake.state.fileSizes.set('34100002', 3_000_000);
+    fake.state.fileSizes.set('34100004', 3_000_000);
+    fake.state.hideLength = true;
+    const { json } = await cli('download', '258674', '34100001', '--out', path.join(dir, 'dl-budget'), '--max-mb', '2');
+    fake.state.fileSizes.clear();
+    fake.state.hideLength = false;
+    assert.deepEqual(json.downloaded, []);
+    assert.match(json.skipped[0].reason, /larger than 2 MB/);
+    // The first file used up the 2 MB, so the second isn't fetched at all.
+    assert.match(json.skipped[1].reason, /over the size limit \(0 MB left/);
+  });
+
   it('rejects an id that is not in the course', async () => {
     const { code, err } = await cli('download', '258674', '999');
     assert.equal(code, 2);
